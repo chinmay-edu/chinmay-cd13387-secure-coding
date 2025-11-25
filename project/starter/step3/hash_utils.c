@@ -42,3 +42,18 @@ void generate_salt(unsigned char* salt, size_t length) {
         salt[i] = (unsigned char)(rand() % 256);
     }
 }
+
+void hex_to_bytes(const char* hex_str, unsigned char* bytes, size_t len) {
+    // Ensure the input string length is even
+    if (len % 2 != 0) {
+        fprintf(stderr, "Error: Hex string length must be even.\n");
+        return;
+    }
+
+    // Loop through the hex string two characters at a time
+    for (size_t i = 0; i < len; i += 2) {
+        // Use sscanf to read two hex characters into a single unsigned char
+        // "%2hhx" means: read exactly 2 hex characters into a 'half-half' integer (unsigned char)
+        sscanf(hex_str + i, "%2hhx", &bytes[i / 2]);
+    }
+}

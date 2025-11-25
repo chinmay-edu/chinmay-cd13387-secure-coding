@@ -5,9 +5,10 @@
 
 #define MAX_LINE_LENGTH 200
 #define MAX_USERNAME_LENGTH 50
-#define MAX_PASSWORD_LENGTH 50
+#define MAX_PASSWORD_LENGTH 65
 #define MAX_SALT_LENGTH 6
 #define MAX_COMMAND_LENGTH 50
+#define SALT_LENGTH 2
 #define FILE_USERS "hashed_users.txt"
 
 // Function to trim newline characters
@@ -48,41 +49,66 @@ int check_login(const char* username, const char* password) {
     char hashed_password[MAX_PASSWORD_LENGTH];
 
     while (fgets(line, sizeof(line), file)) {
-        // Remove the newline character
+        // Remove the newline character if it exists at the end
         trim_newline(line);
+        //printf("Line : %s", line);
+        // We use a temporary pointer for robust token management within this loop iteration
+        char *temp_token = NULL;
 
-        // Split the line into username and password
-
-        char *token1 = NULL;
-        char *token2 = NULL;
-        char *token3 = NULL;
-
-        // 1. Extract the first token
-        token1 = strtok(line, ":");
-        strcpy(file_username, token1);
-        // 2. Extract the second token
-        // Pass NULL to continue scanning the original string
-        if (token1 != NULL) {
-            token2 = strtok(NULL, ":");
-            strcpy(file_salt, token2);
-        }
-
-        // 3. Extract the third token
-        if (token2 != NULL) {
-            token3 = strtok(NULL, ":");
-            strcpy(file_password, token3);
-        }
+        // 1. Extract the username token
+        temp_token = strtok(line, ":");
+        if (temp_token == NULL) continue; // Skip malformed lines
         
-        hash_password(password, file_salt, hashed_password);
-        printf("File Username: %s\n",file_username);
-        printf("File Salt: %s\n",file_salt);
-        printf("File Password: %s\n",file_password);
-        printf("Input Hashed Password: %s\n",hashed_password);
+        // Use strncpy for safety
+        strncpy(file_username, temp_token, MAX_USERNAME_LENGTH - 1);
+        file_username[MAX_USERNAME_LENGTH - 1] = '\0'; // Ensure null termination
 
-        // Compare entered username and password with the file's values
-        if (strcmp(username, file_username) == 0 && strcmp(hashed_password, file_password) == 0) {
-            fclose(file);
-            return 1;  // Login successful
+        if (strcmp(username, file_username) == 0)
+        {
+            // We found the user. Now extract salt and password immediately.
+            
+            // 2. Extract the salt token
+            temp_token = strtok(NULL, ":");
+            if (temp_token == NULL) {
+                printf("Error: Missing salt for user %s\n", file_username);
+                continue; // Skip this user entry
+            }
+            strncpy(file_salt, temp_token, MAX_SALT_LENGTH - 1);
+            file_salt[MAX_SALT_LENGTH - 1] = '\0';
+
+            // 3. Extract the password hash token
+            temp_token = strtok(NULL, ":");
+            if (temp_token == NULL) {
+                printf("Error: Missing password hash for user %s\n", file_username);
+                continue; // Skip this user entry
+            }
+            strncpy(file_password, temp_token, MAX_PASSWORD_LENGTH - 1);
+            file_password[MAX_PASSWORD_LENGTH - 1] = '\0';
+
+            // Debug prints
+            //printf("token1 (Username): %s\n", file_username);
+            //printf("token2 (Salt): %s\n", file_salt);
+            //printf("token3 (File Password): %s\n", file_password);
+
+            trim_newline(file_salt);
+            trim_newline(password);
+
+            unsigned char file_salt_bytes[SALT_LENGTH]; // Use the SALT_LENGTH (2) from generation code
+
+            // CONVERT THE HEX STRING BACK TO BYTES
+            // You need a hex_to_bytes function (assuming it's in hash_utils.h)
+            hex_to_bytes(file_salt, file_salt_bytes, SALT_LENGTH * 2); // Convert 4 hex chars to 2 bytes
+
+            // Now, pass the correct binary salt bytes to the hashing function
+            hash_password(password, file_salt_bytes, hashed_password);
+            
+            //printf("Input Hashed Password: %s\n", hashed_password);
+
+            // Compare generated hash with stored hash
+            if (strcmp(hashed_password, file_password) == 0) {
+                fclose(file);
+                return 1;  // Login successful
+            }
         }
     }
 
